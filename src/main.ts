@@ -21,6 +21,7 @@ const store = new Store<StoreSchema>({
 });
 
 let window: BrowserWindow | null = null;
+let petdexWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let pets: Pet[] = [];
 let mouseX = 0;
@@ -175,6 +176,49 @@ function quitApp(): void {
   app.quit();
 }
 
+function openPetdexGallery(): void {
+  if (petdexWindow && !petdexWindow.isDestroyed()) {
+    petdexWindow.show();
+    petdexWindow.focus();
+    return;
+  }
+
+  petdexWindow = new BrowserWindow({
+    width: 1120,
+    height: 760,
+    minWidth: 820,
+    minHeight: 560,
+    title: 'Change Pet',
+    backgroundColor: '#101010',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  petdexWindow.loadURL('https://petdex.crafter.run');
+
+  petdexWindow.on('closed', () => {
+    petdexWindow = null;
+  });
+}
+
+function setupDockMenu(): void {
+  if (process.platform !== 'darwin' || !app.dock) return;
+
+  const dockMenu = Menu.buildFromTemplate([
+    {
+      label: 'Change Pet',
+      click: () => {
+        openPetdexGallery();
+      }
+    }
+  ]);
+
+  app.dock.setMenu(dockMenu);
+}
+
 function createTray(): void {
   const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
   tray = new Tray(iconPath);
@@ -206,6 +250,13 @@ function updateTrayMenu(): void {
     { label: 'PetDex', enabled: false },
     { type: 'separator' },
     ...petMenuItems,
+    { type: 'separator' },
+    {
+      label: 'Change Pet',
+      click: () => {
+        openPetdexGallery();
+      }
+    },
 
     {
       label: 'Quit',
@@ -284,6 +335,10 @@ function setupIPC(): void {
     const cursor = screen.getCursorScreenPoint();
     return cursor.x;
   });
+
+  ipcMain.handle('open-petdex-gallery', () => {
+    openPetdexGallery();
+  });
 }
 
 app.whenReady().then(() => {
@@ -299,6 +354,7 @@ app.whenReady().then(() => {
 
   createWindow();
   createTray();
+  setupDockMenu();
   setupIPC();
   dockYInterval = setInterval(enforceDockY, 2000);
 

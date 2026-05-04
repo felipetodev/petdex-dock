@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('petdex', {
   getPetMode: (): Promise<unknown> => ipcRenderer.invoke('get-pet-mode'),
   setPetMode: (mode: 'dock' | 'libre'): Promise<void> => ipcRenderer.invoke('set-pet-mode', mode),
   getMousePosition: (): Promise<unknown> => ipcRenderer.invoke('get-mouse-position'),
+  openPetdexGallery: (): Promise<void> => ipcRenderer.invoke('open-petdex-gallery'),
   setPosition: (x: number, y: number): void => { ipcRenderer.send('set-position', x, y); },
   onPetChanged: (callback: (petData: unknown) => void): void => {
     ipcRenderer.on('pet-changed', (_event, petData) => callback(petData));

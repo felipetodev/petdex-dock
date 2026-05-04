@@ -27,6 +27,7 @@ export type PetDexAPI = {
   getPetMode(): Promise<PetMode>;
   setPetMode(mode: PetMode): Promise<void>;
   getMousePosition(): Promise<number>;
+  openPetdexGallery(): Promise<void>;
   setPosition(x: number, y: number): void;
   onPetChanged(callback: (pet: Pet) => void): void;
   onMousePositionChanged(callback: (x: number) => void): void;

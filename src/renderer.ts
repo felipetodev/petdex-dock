@@ -255,6 +255,31 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  contextMenu.addEventListener('click', async (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    const menuItem = target?.closest<HTMLElement>('.menu-item');
+    const action = menuItem?.dataset.action;
+
+    if (action === 'change-pet') {
+      hideContextMenu();
+      await window.petdex.openPetdexGallery();
+    }
+
+    if (action === 'toggle-mode') {
+      hideContextMenu();
+      await toggleMode();
+    }
+  });
+
+  window.addEventListener('contextmenu', (e: MouseEvent) => {
+    e.preventDefault();
+    showContextMenu(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('click', () => {
+    hideContextMenu();
+  });
+
   window.petdex.onPetChanged((pet) => {
     setSpritesheet(pet.spritesheetPath);
     playAnimation('idle', true);
