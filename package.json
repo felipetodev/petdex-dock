@@ -1,0 +1,66 @@
+{
+  "name": "petdex-dock",
+  "version": "0.0.1",
+  "description": "A desktop app that displays Codex pets from the PetDex gallery.",
+  "main": "dist/main.js",
+  "scripts": {
+    "compile": "tsc -p tsconfig.json && esbuild src/renderer.ts --bundle --outfile=dist/renderer.js --target=es2022 --format=iife && cp src/index.html src/styles.css dist/",
+    "start": "pnpm compile && tsx src/main.ts",
+    "dev": "pnpm compile && electron . --enable-logging",
+    "build": "pnpm compile && electron-builder --mac",
+    "build:dir": "pnpm compile && electron-builder --mac --dir"
+  },
+  "author": {
+    "name": "Felipe Ossandon",
+    "email": "fe.ossandon.u@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felipetodev/petdex-dock"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "electron": "33.4.11",
+    "electron-builder": "25.0.0",
+    "esbuild": "0.28.0",
+    "tsx": "4.21.0",
+    "typescript": "6.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "esbuild"]
+  },
+  "dependencies": {
+    "electron-store": "8.2.0"
+  },
+  "build": {
+    "appId": "com.petdex.dock",
+    "productName": "PetDex Dock",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "mac": {
+      "category": "public.app-category.entertainment",
+      "icon": "assets/icon",
+      "artifactName": "PetDex-Dock-${version}-${arch}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "PetDex Dock ${version}",
+      "contents": [
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" },
+        { "x": 130, "y": 220, "type": "file" }
+      ]
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*"
+    ]
+  }
+}
