@@ -1,6 +1,6 @@
 {
   "name": "petdex-dock",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A desktop app that displays Codex pets from the PetDex gallery.",
   "main": "dist/main.js",
   "scripts": {
