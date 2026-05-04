@@ -8,15 +8,13 @@ interface StoreSchema {
   activePet: string | null;
   position: { x: number; y: number } | null;
   fps: number;
-  petMode: 'dock' | 'libre';
 }
 
 const store = new Store<StoreSchema>({
   defaults: {
     activePet: null,
     position: null,
-    fps: 12,
-    petMode: 'dock'
+    fps: 12
   }
 });
 
@@ -122,7 +120,7 @@ function createWindow(): void {
   startMouseTracking();
 }
 
-function enforceDockY(): void {
+function snapToDockY(): void {
   if (!window) return;
   const workArea = getWorkArea();
   const [currentX, currentY] = window.getPosition();
@@ -134,7 +132,7 @@ function enforceDockY(): void {
 }
 
 let mouseTrackingInterval: ReturnType<typeof setInterval> | null = null;
-let dockYInterval: ReturnType<typeof setInterval> | null = null;
+let snapInterval: ReturnType<typeof setInterval> | null = null;
 let lastMouseX = 0;
 
 function startMouseTracking(): void {
@@ -162,9 +160,9 @@ function stopIntervals(): void {
     mouseTrackingInterval = null;
   }
 
-  if (dockYInterval) {
-    clearInterval(dockYInterval);
-    dockYInterval = null;
+  if (snapInterval) {
+    clearInterval(snapInterval);
+    snapInterval = null;
   }
 }
 
@@ -270,8 +268,6 @@ function updateTrayMenu(): void {
 }
 
 function setupIPC(): void {
-  ipcMain.handle('get-pets', () => pets);
-
   ipcMain.handle('get-active-pet', () => {
     const activePetId = store.get('activePet');
     return pets.find(p => p.id === activePetId) || pets[0] || null;
@@ -285,21 +281,6 @@ function setupIPC(): void {
       updateTrayMenu();
     }
     return pet;
-  });
-
-  ipcMain.handle('get-pet-data', (_event, petId: string) => {
-    return pets.find(p => p.id === petId) || null;
-  });
-
-  ipcMain.handle('save-position', (_event, x: number, y: number) => {
-    store.set('position', { x, y });
-  });
-
-  ipcMain.handle('get-window-position', () => {
-    if (window) {
-      return window.getPosition();
-    }
-    return null;
   });
 
   ipcMain.handle('get-dock-bounds', (): DockBounds => {
@@ -323,19 +304,6 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('get-pet-mode', () => {
-    return store.get('petMode');
-  });
-
-  ipcMain.handle('set-pet-mode', (_event, mode: 'dock' | 'libre') => {
-    store.set('petMode', mode);
-  });
-
-  ipcMain.handle('get-mouse-position', () => {
-    const cursor = screen.getCursorScreenPoint();
-    return cursor.x;
-  });
-
   ipcMain.handle('open-petdex-gallery', () => {
     openPetdexGallery();
   });
@@ -356,7 +324,7 @@ app.whenReady().then(() => {
   createTray();
   setupDockMenu();
   setupIPC();
-  dockYInterval = setInterval(enforceDockY, 2000);
+  snapInterval = setInterval(snapToDockY, 2000);
 
   screen.on('display-metrics-changed', (_, _display, changedMetrics) => {
     if (changedMetrics.includes('workArea')) {

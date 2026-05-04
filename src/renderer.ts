@@ -1,4 +1,4 @@
-import type { DockBounds, PetMode } from './types';
+import type { DockBounds } from './types';
 
 const ANIMATIONS: Record<string, { row: number; frames: number; name: string }> = {
   idle:      { row: 0, frames: 6, name: 'idle' },
@@ -33,7 +33,6 @@ let mouseX = 0;
 let isMoving = false;
 let animationTimer: ReturnType<typeof setTimeout> | null = null;
 let isClickDisabled = false;
-let petMode: PetMode = 'dock';
 let roamTimer: ReturnType<typeof setInterval> | null = null;
 
 let cursorTargetX: number | null = null;
@@ -135,14 +134,6 @@ function randomAnimation(): void {
 function getRoamingBounds(): { minX: number; maxX: number } {
   if (!dockBounds) return { minX: 100, maxX: 1720 };
 
-  const isLibre = petMode === 'libre';
-  if (isLibre) {
-    return {
-      minX: DOCK_MARGIN,
-      maxX: (window.screen.width || 1920) - WIN_SIZE - DOCK_MARGIN
-    };
-  }
-
   const minX = dockBounds.left + DOCK_MARGIN;
   const maxX = dockBounds.right - DOCK_MARGIN - WIN_SIZE;
 
@@ -198,8 +189,6 @@ async function loadActivePet(): Promise<void> {
   try {
     const pet = await window.petdex.getActivePet();
     dockBounds = await window.petdex.getDockBounds();
-    petMode = await window.petdex.getPetMode() || 'dock';
-    document.documentElement.classList.toggle('libre', petMode === 'libre');
 
     if (pet && dockBounds) {
       setSpritesheet(pet.spritesheetPath);
@@ -216,14 +205,6 @@ async function loadActivePet(): Promise<void> {
   } catch (error) {
     console.error('Failed to load pet:', error);
   }
-}
-
-async function toggleMode(): Promise<PetMode> {
-  petMode = petMode === 'dock' ? 'libre' : 'dock';
-  await window.petdex.setPetMode(petMode);
-  document.documentElement.classList.toggle('libre', petMode === 'libre');
-  document.getElementById('mode-indicator')!.textContent = petMode === 'libre' ? 'Libre' : 'Dock';
-  return petMode;
 }
 
 setInterval(() => {
@@ -265,10 +246,6 @@ window.addEventListener('DOMContentLoaded', () => {
       await window.petdex.openPetdexGallery();
     }
 
-    if (action === 'toggle-mode') {
-      hideContextMenu();
-      await toggleMode();
-    }
   });
 
   window.addEventListener('contextmenu', (e: MouseEvent) => {
