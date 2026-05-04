@@ -8,6 +8,28 @@ PetDex Dock brings Codex/animated pixel pets to your desktop. It creates a frame
 
 Uses the [PetDex public gallery](https://petdex.crafter.run/) for Codex-compatible animated pets.
 
+## macOS Install Notice
+
+PetDex Dock is distributed directly through GitHub Releases. It is not registered with Apple, not published on the Mac App Store, and current release builds are not signed/notarized with an Apple Developer ID.
+
+Because of that, macOS Gatekeeper may show a warning such as:
+
+> "PetDex Dock" is damaged and can't be opened. You should move it to the Trash.
+
+This does not necessarily mean the downloaded app is corrupted. It is a common macOS protection shown for apps downloaded from the internet when Apple cannot verify a Developer ID signature and notarization ticket.
+
+How to bypass the warning and open PetDex Dock:
+
+1. Download the `.dmg` from GitHub Releases.
+2. Open the `.dmg` and drag `PetDex Dock.app` into `/Applications`.
+3. Remove the macOS quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/PetDex Dock.app"
+```
+
+4. Open `PetDex Dock.app` from `/Applications`.
+
 ## Pets Directory
 
 Pets are installed to `~/.codex/pets/{petId}/` and must contain:
