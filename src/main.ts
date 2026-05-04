@@ -24,6 +24,7 @@ let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let pets: Pet[] = [];
 let mouseX = 0;
+let isQuitting = false;
 
 const PETS_DIR = path.join(app.getPath('home'), '.codex', 'pets');
 
@@ -91,7 +92,6 @@ function createWindow(): void {
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
-    closable: false,
     hasShadow: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -103,12 +103,19 @@ function createWindow(): void {
   window.loadFile(path.join(__dirname, 'index.html'));
 
   window.on('moved', () => {
-    const [newX, newY] = window!.getPosition();
+    if (!window || window.isDestroyed()) return;
+    const [newX, newY] = window.getPosition();
     store.set('position', { x: newX, y: newY });
   });
 
   window.on('close', (event) => {
-    event.preventDefault();
+    if (!isQuitting) {
+      event.preventDefault();
+    }
+  });
+
+  window.on('closed', () => {
+    window = null;
   });
 
   startMouseTracking();
@@ -126,6 +133,7 @@ function enforceDockY(): void {
 }
 
 let mouseTrackingInterval: ReturnType<typeof setInterval> | null = null;
+let dockYInterval: ReturnType<typeof setInterval> | null = null;
 let lastMouseX = 0;
 
 function startMouseTracking(): void {
@@ -143,10 +151,29 @@ function startMouseTracking(): void {
 }
 
 app.on('before-quit', () => {
+  isQuitting = true;
+  stopIntervals();
+});
+
+function stopIntervals(): void {
   if (mouseTrackingInterval) {
     clearInterval(mouseTrackingInterval);
+    mouseTrackingInterval = null;
   }
-});
+
+  if (dockYInterval) {
+    clearInterval(dockYInterval);
+    dockYInterval = null;
+  }
+}
+
+function quitApp(): void {
+  isQuitting = true;
+  stopIntervals();
+  tray?.destroy();
+  tray = null;
+  app.quit();
+}
 
 function createTray(): void {
   const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
@@ -183,8 +210,7 @@ function updateTrayMenu(): void {
     {
       label: 'Quit',
       click: () => {
-        (app as unknown as { isQuitting: boolean }).isQuitting = true;
-        app.quit();
+        quitApp();
       }
     }
   ]);
@@ -274,7 +300,7 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   setupIPC();
-  setInterval(enforceDockY, 2000);
+  dockYInterval = setInterval(enforceDockY, 2000);
 
   screen.on('display-metrics-changed', (_, _display, changedMetrics) => {
     if (changedMetrics.includes('workArea')) {
@@ -291,8 +317,4 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
-});
-
-app.on('before-quit', () => {
-  (app as unknown as { isQuitting: boolean }).isQuitting = true;
 });
