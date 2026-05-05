@@ -2,10 +2,10 @@
   "name": "petdex-dock",
   "version": "0.0.2",
   "description": "A desktop app that displays Codex pets from the PetDex gallery.",
-  "main": "dist/main.js",
+  "main": "dist/main/index.js",
   "scripts": {
-    "compile": "tsc -p tsconfig.json && esbuild src/renderer.ts --bundle --outfile=dist/renderer.js --target=es2022 --format=iife && cp src/index.html src/styles.css dist/",
-    "start": "pnpm compile && tsx src/main.ts",
+    "compile": "tsc -p tsconfig.json && esbuild src/renderer/index.ts --bundle --outfile=dist/renderer.js --target=es2022 --format=iife && cp src/index.html src/styles.css dist/",
+    "start": "pnpm compile && tsx src/main/index.ts",
     "dev": "pnpm compile && electron . --enable-logging",
     "build": "pnpm compile && electron-builder --mac",
     "build:dir": "pnpm compile && electron-builder --mac --dir"
