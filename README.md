@@ -1,5 +1,7 @@
 # PetDex Dock
 
+https://github.com/user-attachments/assets/7d02a17e-1b13-41db-9523-8b75c7d59021
+
 Virtual pet companion for macOS that lives in your Dock.
 
 ## Overview
