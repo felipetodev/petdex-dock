@@ -55,8 +55,9 @@ Defaults: `{ activePet: null, position: null, fps: 12 }`
 
 ## Architecture
 - `src/main/index.ts` — main process entrypoint and orchestration.
-- `src/main/*.ts` — main process modules for window creation, tray, IPC handlers, mouse polling (every 50ms), dock position snap (`snapPetWindowToDockY` every 2s), pets, and store.
-- `src/preload.ts` — `contextBridge.exposeInMainWorld('petdex', { ... })` — IPC invoke/send + event listeners. 9 API methods exposed.
+- `src/main/*.ts` — main process modules for window creation, tray, IPC handlers, mouse polling (every 50ms), dock position snap (`snapPetWindowToDockY` every 2s), CLI event bridge, pets, and store.
+- `src/main/cli-event-bridge.ts` — local HTTP bridge on `127.0.0.1:17321/event` for CLI integrations.
+- `src/preload.ts` — `contextBridge.exposeInMainWorld('petdex', { ... })` — IPC invoke/send + event listeners. 10 API methods exposed.
 - `src/renderer/index.ts` — renderer entrypoint. Compiled via esbuild to IIFE for browser loading.
 - `src/renderer/*.ts` — renderer modules for sprite animation, mouse tracking, dock-constrained roaming, DOM wiring, and pet behavior control.
 - `src/shared/types.ts` — shared type declarations for `Pet`, `DockBounds`, `PetDexAPI`, and `window.petdex`.
@@ -77,11 +78,34 @@ Defaults: `{ activePet: null, position: null, fps: 12 }`
 ## Behavior
 The pet is always dock-constrained: it roams horizontally within the macOS Dock area. `snapToDockY()` runs every 2s in the main process to snap Y position to dock level.
 
+## CLI Event Bridge
+PetDex listens for local CLI events at `POST http://127.0.0.1:17321/event`.
+
+Payload:
+```json
+{ "source": "codex|claude|opencode|manual", "state": "running|waiting|failed|review|idle", "message": "optional" }
+```
+
+Accepted events are sent to the renderer via IPC channel `cli-event`. The renderer overrides normal pet behavior while the CLI state is active. Mouse movement is ignored while a CLI override is active; only another CLI event or `idle` ends the override.
+
+Manual test:
+```bash
+curl -X POST http://127.0.0.1:17321/event \
+  -H 'content-type: application/json' \
+  -d '{"source":"manual","state":"running","message":"debug"}'
+```
+
+CLI integrations proven locally:
+- OpenCode global plugin: `~/.config/opencode/plugins/petdex.js`, using the generic `event` hook and mapping `permission.asked → waiting`, `session.error → failed`, `session.idle → idle`, `session.status → running`, `tool.execute.before → running`, `tool.execute.after → review`.
+- Codex hooks: enable `[features] codex_hooks = true` in `~/.codex/config.toml`, use `~/.codex/hooks.json`, and route command hooks through `~/.codex/hooks/petdex.cjs`.
+- Codex hook mapping: `SessionStart/UserPromptSubmit/PreToolUse → running`, `PermissionRequest → waiting`, `PostToolUse → review`, `Stop → idle`.
+
 ## Interaction Model (renderer-side timings)
 - Mouse X tracking: main process polls cursor every 50ms, sends X to renderer
 - Pet follows cursor X (offset by WIN_SIZE/2), stops following after 3s of cursor stillness
 - Roaming: picks random X target every 5s when not moving, not in AFK animation, and not following cursor (constrained to dock bounds)
 - AFK animations: after `runLeft`/`runRight`, shows exactly one non-run animation (`idle` or waving/waiting/review/failed/jumping) for at least 3s before the next roam move. Cursor movement interrupts AFK immediately and switches to `runLeft`/`runRight`.
+- CLI events override normal movement until another CLI event arrives or `idle` clears the override. Cursor movement does not cancel CLI overrides.
 - Context menu shown on right-click (hidden by default, rendered in-window) — "Change Pet" only
 
 ## Known Issues / TODO
@@ -89,3 +113,4 @@ The pet is always dock-constrained: it roams horizontally within the macOS Dock 
 - [ ] No fullscreen hide behavior
 - [ ] Multi-monitor: dock bounds computed from `screen.getPrimaryDisplay()` only
 - [ ] Pets loaded once at startup — no filesystem watch for new pets
+- [ ] CLI event overrides are persistent until another CLI event or `idle`; consider adding a long failsafe timeout so a missed terminal event cannot leave the pet stuck forever

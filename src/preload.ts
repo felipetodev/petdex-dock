@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('petdex', {
   },
   onMousePositionChanged: (callback: (mouseX: number) => void): void => {
     ipcRenderer.on('mouse-position-changed', (_event, mouseX) => callback(mouseX));
+  },
+  onCliEvent: (callback: (event: unknown) => void): void => {
+    ipcRenderer.on('cli-event', (_event, cliEvent) => callback(cliEvent));
   }
 });

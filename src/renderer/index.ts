@@ -17,4 +17,8 @@ window.addEventListener('DOMContentLoaded', () => {
   window.petdex.onPetChanged((pet) => {
     controller.handlePetChanged(pet);
   });
+
+  window.petdex.onCliEvent((event) => {
+    controller.handleCliEvent(event);
+  });
 });

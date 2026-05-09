@@ -65,6 +65,235 @@ All pets share the same animation states (rows in spritesheet):
 | 7   | running   | 6      |
 | 8   | review    | 6      |
 
+## CLI Event Bridge
+
+PetDex Dock listens for local CLI events at:
+
+```bash
+http://127.0.0.1:17321/event
+```
+
+Send a pet state with:
+
+```bash
+curl -X POST http://127.0.0.1:17321/event \
+  -H 'content-type: application/json' \
+  -d '{"source":"manual","state":"running"}'
+```
+
+Supported payload:
+
+```json
+{
+  "source": "codex|claude|opencode|manual",
+  "state": "running|waiting|failed|review|idle",
+  "message": "optional"
+}
+```
+
+External CLI events override the normal roaming animation while the CLI state is active. Mouse movement is ignored while a CLI override is active; the override ends when another CLI event arrives or when the CLI sends `idle`.
+
+### Claude Code Example
+
+Claude Code HTTP hooks can post directly to the local bridge. Add this shape to your Claude settings if you want a project-local test:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:17321/event",
+            "body": { "source": "claude", "state": "running" }
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:17321/event",
+            "body": { "source": "claude", "state": "waiting" }
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:17321/event",
+            "body": { "source": "claude", "state": "review" }
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### OpenCode Example
+
+Create a global OpenCode plugin at `~/.config/opencode/plugins/petdex.js`, or a project-local plugin at `.opencode/plugins/petdex.js`:
+
+```js
+const endpoint = 'http://127.0.0.1:17321/event';
+
+async function send(state, message) {
+  const payload = { source: 'opencode', state, ...(message ? { message } : {}) };
+
+  await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).catch(() => {});
+}
+
+function mapEventToState(type) {
+  if (type === 'permission.asked') return 'waiting';
+  if (type === 'session.error') return 'failed';
+  if (type === 'session.idle') return 'idle';
+  if (type === 'session.status') return 'running';
+  if (type === 'tool.execute.before') return 'running';
+  if (type === 'tool.execute.after') return 'review';
+  return null;
+}
+
+export const PetDexPlugin = async ({ client }) => {
+  await client.app.log({
+    body: {
+      service: 'petdex',
+      level: 'info',
+      message: 'PetDex OpenCode plugin loaded'
+    }
+  });
+
+  return {
+    event: async ({ event }) => {
+      const state = mapEventToState(event.type);
+
+      await client.app.log({
+        body: {
+          service: 'petdex',
+          level: 'info',
+          message: `OpenCode event: ${event.type}`,
+          extra: { event }
+        }
+      });
+
+      if (state) {
+        await send(state, event.type);
+      }
+    }
+  };
+};
+```
+
+### Codex Example
+
+Enable Codex hooks in `~/.codex/config.toml`:
+
+```toml
+[features]
+codex_hooks = true
+```
+
+Create `~/.codex/hooks/petdex.cjs`:
+
+```js
+const http = require('http');
+
+const EVENT_STATES = {
+  SessionStart: 'running',
+  UserPromptSubmit: 'running',
+  PreToolUse: 'running',
+  PermissionRequest: 'waiting',
+  PostToolUse: 'review',
+  Stop: 'idle'
+};
+
+function readStdin() {
+  return new Promise((resolve) => {
+    let input = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', chunk => { input += chunk; });
+    process.stdin.on('end', () => resolve(input));
+  });
+}
+
+function postEvent(event) {
+  return new Promise((resolve) => {
+    const payload = JSON.stringify(event);
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port: 17321,
+      path: '/event',
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(payload)
+      },
+      timeout: 1000
+    }, response => {
+      response.resume();
+      response.on('end', resolve);
+    });
+
+    request.on('error', resolve);
+    request.on('timeout', () => {
+      request.destroy();
+      resolve();
+    });
+    request.end(payload);
+  });
+}
+
+(async () => {
+  const rawInput = await readStdin();
+  let input = {};
+
+  try {
+    input = rawInput ? JSON.parse(rawInput) : {};
+  } catch {
+    input = {};
+  }
+
+  const hookName = typeof input.hook_event_name === 'string' ? input.hook_event_name : 'Unknown';
+  const state = EVENT_STATES[hookName] || 'review';
+  const toolName = typeof input.tool_name === 'string' ? input.tool_name : '';
+  const message = toolName ? `${hookName}:${toolName}` : hookName;
+
+  await postEvent({ source: 'codex', state, message });
+
+  if (hookName === 'Stop') {
+    process.stdout.write(JSON.stringify({ continue: true }));
+  }
+})();
+```
+
+Create `~/.codex/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{ "matcher": "startup|resume|clear", "hooks": [{ "type": "command", "command": "node ~/.codex/hooks/petdex.cjs" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node ~/.codex/hooks/petdex.cjs" }] }],
+    "PreToolUse": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node ~/.codex/hooks/petdex.cjs" }] }],
+    "PermissionRequest": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node ~/.codex/hooks/petdex.cjs" }] }],
+    "PostToolUse": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node ~/.codex/hooks/petdex.cjs" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "node ~/.codex/hooks/petdex.cjs", "timeout": 5 }] }]
+  }
+}
+```
+
+Restart Codex after changing hook configuration.
+
 ## Configuration
 
 Stored in `~/Library/Application Support/petdex-dock/config.json`:

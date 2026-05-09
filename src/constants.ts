@@ -12,4 +12,7 @@ export const MOUSE_POLL_INTERVAL = 50;
 export const DOCK_SNAP_INTERVAL = 2000;
 export const DOCK_SNAP_TOLERANCE = 2;
 
+export const CLI_EVENT_BRIDGE_HOST = '127.0.0.1';
+export const CLI_EVENT_BRIDGE_PORT = 17321;
+
 export const PETDEX_GALLERY_URL = 'https://petdex.crafter.run';

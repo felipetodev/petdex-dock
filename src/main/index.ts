@@ -1,5 +1,6 @@
 import { app, screen } from 'electron';
 import type { Pet } from '../shared/types';
+import { startCliEventBridge, stopCliEventBridge } from './cli-event-bridge';
 import { setupIPC } from './ipc';
 import { ensurePetsDir, getAllPets, getPetsDir } from './pets';
 import { store } from './store';
@@ -36,6 +37,7 @@ function selectPet(petId: string): Pet | undefined {
 function quitApp(): void {
   isQuitting = true;
   stopIntervals();
+  stopCliEventBridge();
   destroyTray();
   app.quit();
 }
@@ -43,6 +45,7 @@ function quitApp(): void {
 app.on('before-quit', () => {
   isQuitting = true;
   stopIntervals();
+  stopCliEventBridge();
 });
 
 app.whenReady().then(() => {
@@ -85,6 +88,7 @@ app.whenReady().then(() => {
 
   startMouseTracking(getPetWindow);
   startDockSnap(snapPetWindowToDockY);
+  startCliEventBridge({ getPetWindow });
 
   screen.on('display-metrics-changed', (_event, _display, changedMetrics) => {
     if (changedMetrics.includes('workArea')) {

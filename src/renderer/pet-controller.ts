@@ -5,7 +5,7 @@ import {
   ROAM_INTERVAL,
   WIN_SIZE
 } from '../constants';
-import type { DockBounds, Pet, PetDexAPI } from '../shared/types';
+import type { CliPetEvent, DockBounds, Pet, PetDexAPI } from '../shared/types';
 import { AfkAnimationPicker, SpriteAnimator } from './animations';
 import type { AnimationName, MovementSource } from './types';
 import { clampToDockBounds, pickRoamingTarget } from './movement';
@@ -34,6 +34,7 @@ export class PetController {
   private canPlayAfkAnimation = false;
   private movementSource: MovementSource | null = null;
   private cursorTargetX: number | null = null;
+  private isCliEventOverrideActive = false;
 
   private animationTimer: ReturnType<typeof setTimeout> | null = null;
   private roamTimer: ReturnType<typeof setInterval> | null = null;
@@ -78,6 +79,8 @@ export class PetController {
   }
 
   handleMousePosition(mouseX: number): void {
+    if (this.isCliEventOverrideActive) return;
+
     const target = clampToDockBounds(mouseX - WIN_SIZE / 2, this.dockBounds);
 
     if (this.cursorTargetX !== target) {
@@ -101,6 +104,32 @@ export class PetController {
     this.playAnimation('idle', true);
   }
 
+  handleCliEvent(event: CliPetEvent): void {
+    this.clearCliEventOverride(`new event source=${event.source} state=${event.state}`);
+    console.log(`[cli-event] applying source=${event.source} state=${event.state}${event.message ? ` message=${event.message}` : ''}`);
+
+    if (event.state === 'idle') {
+      this.isCliEventOverrideActive = false;
+      if (!this.isMoving) {
+        this.playAnimation('idle', true);
+      }
+      return;
+    }
+
+    if (this.animationTimer) {
+      clearTimeout(this.animationTimer);
+      this.animationTimer = null;
+    }
+
+    this.isMoving = false;
+    this.movementSource = null;
+    this.cursorTargetX = null;
+    this.targetX = this.petX;
+    this.canPlayAfkAnimation = false;
+    this.isCliEventOverrideActive = true;
+    this.playAnimation(event.state, true);
+  }
+
   getState(): PetControllerState {
     return {
       petX: this.petX,
@@ -120,7 +149,7 @@ export class PetController {
   };
 
   private readonly updatePetPosition = (): void => {
-    if (this.animationTimer) {
+    if (this.animationTimer || this.isCliEventOverrideActive) {
       this.api.setPosition(this.petX, this.petY);
       requestAnimationFrame(this.updatePetPosition);
       return;
@@ -211,7 +240,7 @@ export class PetController {
   }
 
   private startRoamingMove(): boolean {
-    if (!this.dockBounds || this.isMoving || this.animationTimer || this.cursorTargetX !== null) {
+    if (!this.dockBounds || this.isMoving || this.animationTimer || this.isCliEventOverrideActive || this.cursorTargetX !== null) {
       return false;
     }
 
@@ -233,5 +262,12 @@ export class PetController {
 
   private playAnimation(animation: AnimationName, loop: boolean): void {
     this.animator.play(animation, loop);
+  }
+
+  private clearCliEventOverride(reason: string): void {
+    if (!this.isCliEventOverrideActive) return;
+
+    console.log(`[cli-event] override interrupted: ${reason}`);
+    this.isCliEventOverrideActive = false;
   }
 }
